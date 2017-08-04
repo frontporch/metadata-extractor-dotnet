@@ -1,6 +1,6 @@
 #region License
 //
-// Copyright 2002-2016 Drew Noakes
+// Copyright 2002-2017 Drew Noakes
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -41,7 +41,7 @@ namespace MetadataExtractor.Formats.QuickTime
         public const int TagWidth = 10;
         public const int TagHeight = 11;
 
-        public override string Name { get; } = "Quicktime Track Header";
+        public override string Name { get; } = "QuickTime Track Header";
 
         private static readonly Dictionary<int, string> _tagNameMap = new Dictionary<int, string>
         {

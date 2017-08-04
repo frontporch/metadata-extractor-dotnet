@@ -1,6 +1,6 @@
 ﻿#region License
 //
-// Copyright 2002-2016 Drew Noakes
+// Copyright 2002-2017 Drew Noakes
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -81,13 +81,14 @@ namespace MetadataExtractor.Formats.QuickTime
         /// <summary>
         /// Gets the string representation of this atom's type.
         /// </summary>
+        [NotNull]
         public string TypeString
         {
             get
             {
                 var bytes = BitConverter.GetBytes(Type);
                 bytes = bytes.Reverse().ToArray();
-#if PORTABLE
+#if NETSTANDARD1_3
                 return Encoding.UTF8.GetString(bytes, 0, bytes.Length);
 #else
                 return Encoding.ASCII.GetString(bytes);
@@ -104,6 +105,9 @@ namespace MetadataExtractor.Formats.QuickTime
     /// <summary>
     /// Static class for processing atoms the QuickTime container format.
     /// </summary>
+    /// <remarks>
+    /// QuickTime file format specification: https://developer.apple.com/library/mac/documentation/QuickTime/QTFF/qtff.pdf
+    /// </remarks>
     public static class QuickTimeReader
     {
         /// <summary>
@@ -141,8 +145,7 @@ namespace MetadataExtractor.Formats.QuickTime
                 if (atomSize == 1)
                 {
                     // Size doesn't fit in 32 bits so read the 64 bit size here
-                    // TODO GetUInt64 (i.e. unsigned)
-                    atomSize = reader.GetInt64();
+                    atomSize = checked((long)reader.GetUInt64());
                 }
                 else
                 {

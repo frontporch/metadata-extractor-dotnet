@@ -1,6 +1,6 @@
 #region License
 //
-// Copyright 2002-2016 Drew Noakes
+// Copyright 2002-2017 Drew Noakes
 // Ported from Java to C# by Yakov Danilov for Imazen LLC in 2014
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
@@ -22,6 +22,7 @@
 //
 #endregion
 
+using System.Text;
 using JetBrains.Annotations;
 using MetadataExtractor.IO;
 
@@ -49,18 +50,18 @@ namespace MetadataExtractor.Formats.Riff
         public void ProcessRiff([NotNull] SequentialReader reader, [NotNull] IRiffHandler handler)
         {
             // RIFF files are always little-endian
-            reader.IsMotorolaByteOrder = false;
+            reader = reader.WithByteOrder(isMotorolaByteOrder: false);
 
             // PROCESS FILE HEADER
 
-            var fileFourCc = reader.GetString(4);
+            var fileFourCc = reader.GetString(4, Encoding.UTF8);
             if (fileFourCc != "RIFF")
                 throw new RiffProcessingException("Invalid RIFF header: " + fileFourCc);
 
             // The total size of the chunks that follow plus 4 bytes for the 'WEBP' FourCC
             var fileSize = reader.GetInt32();
             var sizeLeft = fileSize;
-            var identifier = reader.GetString(4);
+            var identifier = reader.GetString(4, Encoding.UTF8);
             sizeLeft -= 4;
 
             if (!handler.ShouldAcceptRiffIdentifier(identifier))
@@ -70,11 +71,11 @@ namespace MetadataExtractor.Formats.Riff
 
             while (sizeLeft != 0)
             {
-                var chunkFourCc = reader.GetString(4);
+                var chunkFourCc = reader.GetString(4, Encoding.UTF8);
                 var chunkSize = reader.GetInt32();
 
                 sizeLeft -= 8;
-                
+
                 // NOTE we fail a negative chunk size here (greater than 0x7FFFFFFF) as we cannot allocate arrays larger than this
                 if (chunkSize < 0 || sizeLeft < chunkSize)
                     throw new RiffProcessingException("Invalid RIFF chunk size");

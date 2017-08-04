@@ -7,12 +7,13 @@ namespace MetadataExtractor.Tools.FileProcessor
 {
     internal abstract class FileHandlerBase : IFileHandler
     {
-        private static readonly ISet<string> _supportedExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        private static readonly ICollection<string> _supportedExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
             "jpg", "jpeg", "png", "gif", "bmp", "ico", "webp", "pcx", "ai", "eps",
             "nef", "crw", "cr2", "orf", "arw", "raf", "srw", "x3f", "rw2", "rwl",
             "tif", "tiff", "psd", "dng",
-            "3g2", "3gp", "m4v", "mov", "mp4"
+            "3g2", "3gp", "m4v", "mov", "mp4",
+            "pbm", "pnm", "pgm"
         };
 
         private int _processedFileCount;
@@ -38,10 +39,10 @@ namespace MetadataExtractor.Tools.FileProcessor
         public virtual void OnExtractionError(string filePath, Exception exception, TextWriter log)
         {
             _exceptionCount++;
-            log.Write("\t[{0}] {1}\n", exception.GetType().Name, filePath);
+            log.Write($"\t[{exception.GetType().Name}] {filePath}\n");
         }
 
-        public virtual void OnExtractionSuccess(string filePath, IReadOnlyList<Directory> directories, string relativePath, TextWriter log)
+        public virtual void OnExtractionSuccess(string filePath, IList<Directory> directories, string relativePath, TextWriter log)
         {
             if (!directories.Any(d => d.HasError))
                 return;
@@ -53,20 +54,19 @@ namespace MetadataExtractor.Tools.FileProcessor
                     continue;
                 foreach (var error in directory.Errors)
                 {
-                    log.Write("\t[{0}] {1}\n", directory.Name, error);
+                    log.Write($"\t[{directory.Name}] {error}\n");
                     _errorCount++;
                 }
             }
         }
 
-        public void OnScanCompleted(TextWriter log)
+        public virtual void OnScanCompleted(TextWriter log)
         {
             if (_processedFileCount <= 0)
                 return;
 
             log.WriteLine(
-                "Processed {0:#,##0} files ({1:#,##0} bytes) with {2:#,##0} exceptions and {3:#,##0} file errors\n",
-                _processedFileCount, _processedByteCount, _exceptionCount, _errorCount);
+                $"Processed {_processedFileCount:#,##0} files ({_processedByteCount:#,##0} bytes) with {_exceptionCount:#,##0} exceptions and {_errorCount:#,##0} file errors\n");
         }
     }
 }

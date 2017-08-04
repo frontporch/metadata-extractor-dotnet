@@ -1,6 +1,6 @@
 #region License
 //
-// Copyright 2002-2016 Drew Noakes
+// Copyright 2002-2017 Drew Noakes
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -48,7 +48,7 @@ namespace MetadataExtractor.Tools.FileProcessor
         /// <summary>
         /// Called when extraction on <paramref name="filePath"/> completed without an exception.
         /// </summary>
-        void OnExtractionSuccess([NotNull] string filePath, [NotNull] IReadOnlyList<Directory> directories, [NotNull] string relativePath, [NotNull] TextWriter log);
+        void OnExtractionSuccess([NotNull] string filePath, [NotNull] IList<Directory> directories, [NotNull] string relativePath, [NotNull] TextWriter log);
 
         /// <summary>
         /// Called when extraction on <paramref name="filePath"/> resulted in an exception.

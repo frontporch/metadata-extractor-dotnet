@@ -1,6 +1,6 @@
 #region License
 //
-// Copyright 2002-2016 Drew Noakes
+// Copyright 2002-2017 Drew Noakes
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -23,26 +23,27 @@
 
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
+using JetBrains.Annotations;
+
+#if NET35
+using DirectoryList = System.Collections.Generic.IList<MetadataExtractor.Directory>;
+#else
+using DirectoryList = System.Collections.Generic.IReadOnlyList<MetadataExtractor.Directory>;
+#endif
 
 namespace MetadataExtractor.Formats.QuickTime
 {
-    public static class QuicktimeMetadataReader
+    public static class QuickTimeMetadataReader
     {
         private static readonly DateTime _epoch = new DateTime(1904, 1, 1);
 
-        public static
-#if NET35 || PORTABLE
-            IList<Directory>
-#else
-            IReadOnlyList<Directory>
-#endif
-            ReadMetadata(Stream stream)
+        [NotNull]
+        public static DirectoryList ReadMetadata([NotNull] Stream stream)
         {
             var directories = new List<Directory>();
 
-            Action<AtomCallbackArgs> trakHandler = a =>
+            void TrakHandler(AtomCallbackArgs a)
             {
                 switch (a.TypeString)
                 {
@@ -68,46 +69,39 @@ namespace MetadataExtractor.Formats.QuickTime
                         break;
                     }
                 }
-            };
+            }
 
-//            Action<AtomCallbackArgs> clipHandler = a =>
-//            {
-//                Debug.WriteLine($"- Atom {a.TypeString} of size {a.Size}");
-//            };
-
-            var moovHandler = (Action<AtomCallbackArgs>) (a =>
+            void MoovHandler(AtomCallbackArgs a)
             {
-//                Debug.WriteLine($"- Atom {a.TypeString} of size {a.Size}");
-
                 switch (a.TypeString)
                 {
                     case "mvhd":
                     {
-                        var directory = new QuicktimeMovieHeaderDirectory();
-                        directory.Set(QuicktimeMovieHeaderDirectory.TagVersion, a.Reader.GetByte());
-                        directory.Set(QuicktimeMovieHeaderDirectory.TagFlags, a.Reader.GetBytes(3));
-                        directory.Set(QuicktimeMovieHeaderDirectory.TagCreated, _epoch.AddTicks(TimeSpan.TicksPerSecond*a.Reader.GetUInt32()));
-                        directory.Set(QuicktimeMovieHeaderDirectory.TagModified, _epoch.AddTicks(TimeSpan.TicksPerSecond*a.Reader.GetUInt32()));
+                        var directory = new QuickTimeMovieHeaderDirectory();
+                        directory.Set(QuickTimeMovieHeaderDirectory.TagVersion, a.Reader.GetByte());
+                        directory.Set(QuickTimeMovieHeaderDirectory.TagFlags, a.Reader.GetBytes(3));
+                        directory.Set(QuickTimeMovieHeaderDirectory.TagCreated, _epoch.AddTicks(TimeSpan.TicksPerSecond*a.Reader.GetUInt32()));
+                        directory.Set(QuickTimeMovieHeaderDirectory.TagModified, _epoch.AddTicks(TimeSpan.TicksPerSecond*a.Reader.GetUInt32()));
                         var timeScale = a.Reader.GetUInt32();
-                        directory.Set(QuicktimeMovieHeaderDirectory.TagTimeScale, timeScale);
-                        directory.Set(QuicktimeMovieHeaderDirectory.TagDuration, TimeSpan.FromSeconds(a.Reader.GetUInt32()/(double) timeScale));
-                        directory.Set(QuicktimeMovieHeaderDirectory.TagPreferredRate, a.Reader.Get32BitFixedPoint());
-                        directory.Set(QuicktimeMovieHeaderDirectory.TagPreferredVolume, a.Reader.Get16BitFixedPoint());
+                        directory.Set(QuickTimeMovieHeaderDirectory.TagTimeScale, timeScale);
+                        directory.Set(QuickTimeMovieHeaderDirectory.TagDuration, TimeSpan.FromSeconds(a.Reader.GetUInt32()/(double) timeScale));
+                        directory.Set(QuickTimeMovieHeaderDirectory.TagPreferredRate, a.Reader.Get32BitFixedPoint());
+                        directory.Set(QuickTimeMovieHeaderDirectory.TagPreferredVolume, a.Reader.Get16BitFixedPoint());
                         a.Reader.Skip(10);
-                        directory.Set(QuicktimeMovieHeaderDirectory.TagMatrix, a.Reader.GetBytes(36));
-                        directory.Set(QuicktimeMovieHeaderDirectory.TagPreviewTime, a.Reader.GetUInt32());
-                        directory.Set(QuicktimeMovieHeaderDirectory.TagPreviewDuration, a.Reader.GetUInt32());
-                        directory.Set(QuicktimeMovieHeaderDirectory.TagPosterTime, a.Reader.GetUInt32());
-                        directory.Set(QuicktimeMovieHeaderDirectory.TagSelectionTime, a.Reader.GetUInt32());
-                        directory.Set(QuicktimeMovieHeaderDirectory.TagSelectionDuration, a.Reader.GetUInt32());
-                        directory.Set(QuicktimeMovieHeaderDirectory.TagCurrentTime, a.Reader.GetUInt32());
-                        directory.Set(QuicktimeMovieHeaderDirectory.TagNextTrackId, a.Reader.GetUInt32());
+                        directory.Set(QuickTimeMovieHeaderDirectory.TagMatrix, a.Reader.GetBytes(36));
+                        directory.Set(QuickTimeMovieHeaderDirectory.TagPreviewTime, a.Reader.GetUInt32());
+                        directory.Set(QuickTimeMovieHeaderDirectory.TagPreviewDuration, a.Reader.GetUInt32());
+                        directory.Set(QuickTimeMovieHeaderDirectory.TagPosterTime, a.Reader.GetUInt32());
+                        directory.Set(QuickTimeMovieHeaderDirectory.TagSelectionTime, a.Reader.GetUInt32());
+                        directory.Set(QuickTimeMovieHeaderDirectory.TagSelectionDuration, a.Reader.GetUInt32());
+                        directory.Set(QuickTimeMovieHeaderDirectory.TagCurrentTime, a.Reader.GetUInt32());
+                        directory.Set(QuickTimeMovieHeaderDirectory.TagNextTrackId, a.Reader.GetUInt32());
                         directories.Add(directory);
                         break;
                     }
                     case "trak":
                     {
-                        QuickTimeReader.ProcessAtoms(stream, trakHandler, a.BytesLeft);
+                        QuickTimeReader.ProcessAtoms(stream, TrakHandler, a.BytesLeft);
                         break;
                     }
 //                    case "clip":
@@ -125,35 +119,33 @@ namespace MetadataExtractor.Formats.QuickTime
 //                        break;
 //                    }
                 }
-            });
+            }
 
-            Action<AtomCallbackArgs> handler = a =>
+            void Handler(AtomCallbackArgs a)
             {
-//                Debug.WriteLine($"- Atom {a.TypeString} of size {a.Size}");
-
                 switch (a.TypeString)
                 {
                     case "moov":
                     {
-                        QuickTimeReader.ProcessAtoms(stream, moovHandler, a.BytesLeft);
+                        QuickTimeReader.ProcessAtoms(stream, MoovHandler, a.BytesLeft);
                         break;
                     }
                     case "ftyp":
                     {
-                        var directory = new QuicktimeFileTypeDirectory();
-                        directory.Set(QuicktimeFileTypeDirectory.TagMajorBrand, a.Reader.Get4ccString());
-                        directory.Set(QuicktimeFileTypeDirectory.TagMinorVersion, a.Reader.GetUInt32());
+                        var directory = new QuickTimeFileTypeDirectory();
+                        directory.Set(QuickTimeFileTypeDirectory.TagMajorBrand, a.Reader.Get4ccString());
+                        directory.Set(QuickTimeFileTypeDirectory.TagMinorVersion, a.Reader.GetUInt32());
                         var compatibleBrands = new List<string>();
                         while (a.BytesLeft >= 4)
                             compatibleBrands.Add(a.Reader.Get4ccString());
-                        directory.Set(QuicktimeFileTypeDirectory.TagCompatibleBrands, compatibleBrands);
+                        directory.Set(QuickTimeFileTypeDirectory.TagCompatibleBrands, compatibleBrands);
                         directories.Add(directory);
                         break;
                     }
                 }
-            };
+            }
 
-            QuickTimeReader.ProcessAtoms(stream, handler);
+            QuickTimeReader.ProcessAtoms(stream, Handler);
 
             return directories;
         }

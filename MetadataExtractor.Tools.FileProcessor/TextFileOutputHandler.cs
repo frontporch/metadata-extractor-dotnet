@@ -1,6 +1,6 @@
 #region License
 //
-// Copyright 2002-2016 Drew Noakes
+// Copyright 2002-2017 Drew Noakes
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -23,11 +23,14 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Text;
 using JetBrains.Annotations;
 using MetadataExtractor.Formats.FileSystem;
 using MetadataExtractor.Formats.Xmp;
+using MetadataExtractor.Util;
 
 namespace MetadataExtractor.Tools.FileProcessor
 {
@@ -49,7 +52,7 @@ namespace MetadataExtractor.Tools.FileProcessor
             log.Write('\n');
         }
 
-        public override void OnExtractionSuccess(string filePath, IReadOnlyList<Directory> directories, string relativePath, TextWriter log)
+        public override void OnExtractionSuccess(string filePath, IList<Directory> directories, string relativePath, TextWriter log)
         {
             base.OnExtractionSuccess(filePath, directories, relativePath, log);
 
@@ -97,7 +100,10 @@ namespace MetadataExtractor.Tools.FileProcessor
                                 var wrote = false;
                                 foreach (var prop in xmpDirectory.XmpMeta.Properties)
                                 {
-                                    writer.WriteLine($"[XMPMeta - {prop.Namespace}] {prop.Path} = {prop.Value}");
+                                    var value = prop.Value;
+                                    if (value?.Length > 512)
+                                        value = value.Substring(0, 512) + $" <truncated from {value.Length} characters>";
+                                    writer.WriteLine($"[XMPMeta - {prop.Namespace}] {prop.Path} = {value}");
                                     wrote = true;
                                 }
                                 if (wrote)
@@ -107,18 +113,20 @@ namespace MetadataExtractor.Tools.FileProcessor
 
                         // Write file structure
                         var tree = directories.ToLookup(d => d.Parent);
-                        const int indent = 4;
-                        Action<Directory, int> writeLevel = null;
-                        writeLevel = (parent, level) =>
+
+                        void WriteLevel(Directory parent, int level)
                         {
+                            const int indent = 4;
+
                             foreach (var child in tree[parent])
                             {
                                 writer.Write(new string(' ', level*indent));
                                 writer.Write($"- {child.Name}\n");
-                                writeLevel(child, level + 1);
+                                WriteLevel(child, level + 1);
                             }
-                        };
-                        writeLevel(null, 0);
+                        }
+
+                        WriteLevel(null, 0);
 
                         writer.Write('\n');
                     }
@@ -159,6 +167,7 @@ namespace MetadataExtractor.Tools.FileProcessor
         private static TextWriter OpenWriter(string filePath)
         {
             var directoryPath = Path.GetDirectoryName(filePath);
+            Debug.Assert(directoryPath != null);
             var metadataPath = Path.Combine(directoryPath, "metadata");
             var fileName = Path.GetFileName(filePath);
 
@@ -168,8 +177,16 @@ namespace MetadataExtractor.Tools.FileProcessor
 
             var outputPath = $"{directoryPath}/metadata/{fileName}.txt";
 
-            var writer = new StreamWriter(outputPath, false);
-            writer.Write("FILE: {0}\n\n", fileName);
+            var stream = File.Open(outputPath, FileMode.Create);
+            var writer = new StreamWriter(stream, new UTF8Encoding(false));
+            writer.Write("FILE: {0}\n", fileName);
+
+            // Detect file type
+            using (var fileTypeDetectStream = File.Open(filePath, FileMode.Open, FileAccess.Read, FileShare.Read))
+            {
+                var fileType = FileTypeDetector.DetectFileType(fileTypeDetectStream);
+                writer.Write("TYPE: {0}\n\n", fileType.ToString().ToUpper());
+            }
 
             return writer;
         }
